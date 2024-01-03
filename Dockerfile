@@ -10,7 +10,6 @@ RUN apk update && \
 # Add musl dev
 RUN apk add --no-cache musl-dev
 
-RUN rustup target add $(uname -p)-unknown-linux-musl
 RUN update-ca-certificates
 
 # Create appuser
@@ -31,7 +30,7 @@ RUN adduser \
 COPY . .
 
 # Build to root dir for consistant copy
-RUN CARGO_TARGET_DIR=/app/span_relay cargo build --release --target $(uname -p)-unknown-linux-musl
+RUN CARGO_TARGET_DIR=/app/span_relay cargo build --release
 
 
 # Use alpine as the final base image
