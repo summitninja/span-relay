@@ -44,9 +44,9 @@ COPY --from=builder /etc/group /etc/group
 WORKDIR /app
 
 # Copy the built binary from the builder stage
-COPY --from=builder /app/span_relay .
+COPY --from=builder /app/release/span_relay /app/span_relay
 
 USER span_relay:span_relay
 
 # Set the binary as the entrypoint
-ENTRYPOINT ["/app/my_app"]
+ENTRYPOINT ["/app/span_relay"]
