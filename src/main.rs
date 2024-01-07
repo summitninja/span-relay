@@ -60,7 +60,7 @@ fn main() {
             .map(|v| serde_json::from_value(v.to_owned().to_owned()).unwrap())
             .collect();
 
-        let influx_payload: Vec<String> = circuits
+        let mut influx_payload: Vec<String> = circuits
         .iter()
         .map(|v| {
             format!(
@@ -78,6 +78,20 @@ fn main() {
             )
         })
         .collect();
+
+        let response = client
+            .get(format!("{}/api/v1/panel", &span_host))
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .expect("Failed to send request");
+
+        let panel = response.json::<serde_json::Value>().unwrap();
+
+        influx_payload.push(format!(
+            "feed_through,source=span produced={}\nfeed_through,source=span consumed={}",
+            panel["feedthroughEnergy"]["producedEnergyWh"],
+            panel["feedthroughEnergy"]["consumedEnergyWh"]
+        ));
 
         // upload to influx cloud
         let client = reqwest::blocking::Client::new();
