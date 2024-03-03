@@ -1,3 +1,4 @@
+use anyhow::Result;
 use reqwest;
 use std::env;
 use std::thread;
@@ -40,15 +41,15 @@ fn main() {
     let influx_host =
         env::var("INFLUX_HOST").expect("Missing environment variable 'INFLUX_HOST' Exiting");
 
-    loop {
+    // Function to handle the logic
+    let handle_logic = || -> Result<()> {
         let client = reqwest::blocking::Client::new();
         let response = client
             .get(format!("{}/api/v1/circuits", &span_host))
             .header("Authorization", format!("Bearer {}", api_key))
-            .send()
-            .expect("Failed to send request");
+            .send()?;
 
-        let circuits = response.json::<serde_json::Value>().unwrap();
+        let circuits = response.json::<serde_json::Value>()?;
         let circuits: Vec<CircuitData> = circuits["circuits"]
             .to_owned()
             .as_object()
@@ -61,29 +62,28 @@ fn main() {
             .collect();
 
         let mut influx_payload: Vec<String> = circuits
-        .iter()
-        .map(|v| {
-            format!(
-                "{0},source=span instant_power={1}\n{0},source=span consumed_kw={2}\n{0},source=span produced_kw={3}\n{0},source=span state={4}",
-                v.name
-                    .to_lowercase()
-                    .replace(" ", "_")
-                    .chars()
-                    .filter(|c| c.is_alphanumeric() || *c == '_')
-                    .collect::<String>(),
-                v.instant_power_w,
-                v.consumed_energy_wh,
-                v.produced_energy_wh,
-                if v.relay_state == "CLOSED" { "1" } else { "0" },
-            )
-        })
-        .collect();
+            .iter()
+            .map(|v| {
+                format!(
+                    "{0},source=span instant_power={1}\n{0},source=span consumed_kw={2}\n{0},source=span produced_kw={3}\n{0},source=span state={4}",
+                    v.name
+                        .to_lowercase()
+                        .replace(" ", "_")
+                        .chars()
+                        .filter(|c| c.is_alphanumeric() || *c == '_')
+                        .collect::<String>(),
+                    v.instant_power_w,
+                    v.consumed_energy_wh,
+                    v.produced_energy_wh,
+                    if v.relay_state == "CLOSED" { "1" } else { "0" },
+                )
+            })
+            .collect();
 
         let response = client
             .get(format!("{}/api/v1/panel", &span_host))
             .header("Authorization", format!("Bearer {}", api_key))
-            .send()
-            .expect("Failed to send request");
+            .send()?;
 
         let panel = response.json::<serde_json::Value>().unwrap();
 
@@ -100,11 +100,15 @@ fn main() {
             .header("Content-Type", "text/plain")
             .basic_auth(&influx_username, Some(&influx_api_key))
             .body(influx_payload.join("\n"))
-            .send()
-            .expect("Failed to send request");
+            .send()?;
 
         println!("Response: {:?}", response.status());
+        Ok(())
+    };
 
+    loop {
+        // Call the logic function
+        let _ = handle_logic();
         thread::sleep(Duration::from_secs(60));
     }
 }
